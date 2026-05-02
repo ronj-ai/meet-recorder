@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meet Recorder & Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f5f5f4;
+      --bg-tertiary: #eeede9;
+      --text-primary: #1a1a18;
+      --text-secondary: #6b6b68;
+      --text-tertiary: #a0a09c;
+      --border-tertiary: rgba(0,0,0,0.12);
+      --border-secondary: rgba(0,0,0,0.22);
+      --border-primary: rgba(0,0,0,0.35);
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1e1e1c;
+        --bg-secondary: #2a2a28;
+        --bg-tertiary: #333330;
+        --text-primary: #f0efeb;
+        --text-secondary: #9e9e9a;
+        --text-tertiary: #6b6b68;
+        --border-tertiary: rgba(255,255,255,0.1);
+        --border-secondary: rgba(255,255,255,0.18);
+        --border-primary: rgba(255,255,255,0.28);
+      }
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 680px;
+      background: var(--bg-primary);
+      border-radius: var(--radius-lg);
+      border: 0.5px solid var(--border-tertiary);
+      padding: 2rem;
+    }
+
+    .header { margin-bottom: 2rem; }
+    .header h1 { font-size: 20px; font-weight: 500; color: var(--text-primary); }
+    .header p { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+    .tabs { display: flex; gap: 4px; margin-bottom: 1.5rem; border-bottom: 0.5px solid var(--border-tertiary); }
+    .tab { padding: 8px 16px; font-size: 13px; cursor: pointer; border: none; background: none; color: var(--text-secondary); border-bottom: 2px solid transparent; transition: all 0.15s; font-family: var(--font); }
+    .tab.active { color: var(--text-primary); border-bottom: 2px solid var(--text-primary); font-weight: 500; }
+    .tab:hover:not(.active) { color: var(--text-primary); }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .input-modes { display: flex; gap: 6px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .mode-btn { padding: 6px 14px; font-size: 12px; border-radius: 100px; border: 0.5px solid var(--border-secondary); background: var(--bg-primary); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; font-family: var(--font); }
+    .mode-btn.active { background: var(--text-primary); color: var(--bg-primary); border-color: transparent; }
+
+    input[type="text"], input[type="url"] {
+      width: 100%; padding: 8px 12px; font-size: 13px; font-family: var(--font);
+      border: 0.5px solid var(--border-secondary); border-radius: var(--radius-md);
+      background: var(--bg-primary); color: var(--text-primary); outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: var(--border-primary); box-shadow: 0 0 0 2px rgba(0,0,0,0.06); }
+
+    .btn {
+      padding: 8px 18px; border-radius: var(--radius-md); font-size: 13px; cursor: pointer;
+      border: 0.5px solid var(--border-secondary); background: var(--bg-primary);
+      color: var(--text-primary); transition: all 0.15s; font-family: var(--font);
+    }
+    .btn:hover { background: var(--bg-secondary); }
+    .btn:active { transform: scale(0.98); }
+    .btn.primary { background: var(--text-primary); color: var(--bg-primary); border-color: transparent; }
+    .btn.primary:hover { opacity: 0.85; }
+    .btn.danger { background: #E24B4A; color: white; border-color: transparent; }
+    .btn.danger:hover { background: #A32D2D; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-full { width: 100%; }
+
+    .url-row { display: flex; gap: 8px; }
+    .url-row input { flex: 1; }
+    .url-hint { font-size: 11px; color: var(--text-secondary); margin-top: 6px; }
+    .platform-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .chip { font-size: 11px; padding: 3px 10px; border-radius: 100px; border: 0.5px solid var(--border-tertiary); color: var(--text-secondary); background: var(--bg-primary); cursor: pointer; transition: all 0.15s; font-family: var(--font); }
+    .chip:hover { background: var(--bg-secondary); color: var(--text-primary); }
+
+    .record-section { background: var(--bg-secondary); border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.25rem; }
+    .record-status { display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #639922; flex-shrink: 0; }
+    .status-dot.recording { background: #E24B4A; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .status-label { font-size: 13px; color: var(--text-secondary); }
+    .timer { font-size: 28px; font-weight: 500; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-bottom: 1.5rem; }
+    .progress-bar { height: 3px; background: var(--border-tertiary); border-radius: 2px; margin-top: 1rem; overflow: hidden; }
+    .progress-fill { height: 100%; background: #378ADD; width: 0%; transition: width 0.3s; }
+
+    .upload-zone { border: 1px dashed var(--border-secondary); border-radius: var(--radius-lg); padding: 2.5rem 2rem; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg-secondary); }
+    .upload-zone:hover { border-color: var(--border-primary); background: var(--bg-primary); }
+    .upload-zone.dragover { border-color: #378ADD; background: #E6F1FB; }
+    .upload-icon { width: 44px; height: 44px; background: var(--bg-primary); border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 20px; }
+    .upload-title { font-size: 15px; font-weight: 500; color: var(--text-primary); margin-bottom: 6px; }
+    .upload-sub { font-size: 12px; color: var(--text-secondary); }
+
+    .file-info { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-md); background: var(--bg-primary); margin-bottom: 1rem; }
+    .file-details { flex: 1; }
+    .file-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+    .file-size { font-size: 11px; color: var(--text-secondary); }
+
+    .badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 100px; font-weight: 500; }
+    .badge-blue { background: #E6F1FB; color: #0C447C; }
+    .badge-green { background: #EAF3DE; color: #27500A; }
+
+    video { width: 100%; border-radius: var(--radius-md); border: 0.5px solid var(--border-tertiary); margin-bottom: 1rem; background: #000; max-height: 200px; display: block; }
+
+    .url-preview { border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1rem; background: var(--bg-primary); }
+    .url-preview-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 0.5px solid var(--border-tertiary); }
+    .url-favicon { width: 16px; height: 16px; border-radius: 3px; }
+    .url-title { font-size: 13px; font-weight: 500; color: var(--text-primary); flex: 1; }
+    .url-domain { font-size: 11px; color: var(--text-secondary); }
+    .url-video-wrap { background: #000; }
+    .url-video-wrap iframe { width: 100%; height: 200px; border: none; display: block; }
+    .url-meta { display: flex; gap: 16px; padding: 10px 14px; flex-wrap: wrap; }
+    .url-meta-item { font-size: 11px; color: var(--text-secondary); }
+    .url-meta-item span { color: var(--text-primary); font-weight: 500; }
+
+    .url-loading { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-md); background: var(--bg-secondary); margin-bottom: 1rem; font-size: 13px; color: var(--text-secondary); }
+    .mini-spinner { width: 16px; height: 16px; border: 1.5px solid var(--border-tertiary); border-top-color: #378ADD; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-box { padding: 10px 14px; background: #FCEBEB; border: 0.5px solid #F09595; border-radius: var(--radius-md); font-size: 13px; color: #791F1F; margin-bottom: 1rem; }
+
+    .caption-container { max-height: 340px; overflow-y: auto; border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-md); background: var(--bg-primary); }
+    .caption-item { display: flex; gap: 12px; padding: 10px 14px; border-bottom: 0.5px solid var(--border-tertiary); transition: background 0.1s; }
+    .caption-item:last-child { border-bottom: none; }
+    .caption-item:hover { background: var(--bg-secondary); }
+    .caption-ts { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; min-width: 40px; padding-top: 2px; flex-shrink: 0; }
+    .caption-speaker { font-size: 11px; font-weight: 500; color: #185FA5; min-width: 80px; flex-shrink: 0; }
+    .caption-text { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+
+    .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1.5rem; }
+    .metric-card { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 1rem; }
+    .metric-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+    .metric-value { font-size: 22px; font-weight: 500; color: var(--text-primary); }
+
+    .analysis-card { background: var(--bg-primary); border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+    .analysis-card h3 { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .analysis-card p { font-size: 13px; color: var(--text-primary); line-height: 1.7; }
+
+    .action-list { list-style: none; }
+    .action-list li { display: flex; gap: 8px; font-size: 13px; color: var(--text-primary); padding: 6px 0; border-bottom: 0.5px solid var(--border-tertiary); line-height: 1.5; }
+    .action-list li:last-child { border-bottom: none; }
+    .action-check { color: #3B6D11; flex-shrink: 0; }
+
+    .speaker-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .speaker-name { font-size: 12px; color: var(--text-secondary); width: 90px; flex-shrink: 0; }
+    .speaker-track { flex: 1; height: 6px; background: var(--border-tertiary); border-radius: 3px; overflow: hidden; }
+    .speaker-fill { height: 100%; border-radius: 3px; }
+    .speaker-pct { font-size: 11px; color: var(--text-secondary); width: 32px; text-align: right; flex-shrink: 0; }
+
+    .topic-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .download-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .download-btn { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-md); background: var(--bg-primary); cursor: pointer; transition: all 0.15s; color: var(--text-primary); font-family: var(--font); }
+    .download-btn:hover { background: var(--bg-secondary); border-color: var(--border-secondary); }
+    .dl-icon { font-size: 18px; flex-shrink: 0; }
+    .dl-info { flex: 1; }
+    .dl-label { font-size: 13px; font-weight: 500; }
+    .dl-sub { font-size: 11px; color: var(--text-secondary); }
+
+    .processing-state { text-align: center; padding: 3rem; }
+    .processing-state p { font-size: 14px; color: var(--text-secondary); margin-top: 0.75rem; }
+    .spinner { width: 32px; height: 32px; border: 2px solid var(--border-tertiary); border-top-color: #378ADD; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+    .empty-state { text-align: center; padding: 2.5rem; color: var(--text-secondary); font-size: 13px; }
+
+    .spacer { margin-bottom: 1rem; }
+    .spacer-sm { margin-bottom: 0.5rem; }
+
+    @media (max-width: 480px) {
+      body { padding: 0; }
+      .app { border-radius: 0; border: none; padding: 1.25rem; }
+      .analysis-grid { grid-template-columns: 1fr; }
+      .download-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Meet Recorder & Analyzer</h1>
+    <p>Record, import from URL, transcribe, and analyze your meetings — free, offline-ready</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('record')">Record</button>
+    <button class="tab" onclick="switchTab('captions')">Captions</button>
+    <button class="tab" onclick="switchTab('analysis')">Analysis</button>
+    <button class="tab" onclick="switchTab('download')">Download</button>
+  </div>
+
+  <!-- RECORD TAB -->
+  <div id="tab-record" class="section active">
+    <div class="input-modes">
+      <button class="mode-btn active" id="mode-screen" onclick="setMode('screen')">Screen record</button>
+      <button class="mode-btn" id="mode-url" onclick="setMode('url')">Video URL</button>
+      <button class="mode-btn" id="mode-upload" onclick="setMode('upload')">Upload file</button>
+    </div>
+
+    <!-- Screen record -->
+    <div id="panel-screen">
+      <div class="record-section">
+        <div class="record-status">
+          <div class="status-dot" id="status-dot"></div>
+          <span class="status-label" id="status-label">Ready to record</span>
+        </div>
+        <div class="timer" id="timer">00:00:00</div>
+        <div class="btn-row">
+          <button class="btn primary" id="btn-start" onclick="startRecording()">Start recording</button>
+          <button class="btn danger" id="btn-stop" onclick="stopRecording()" disabled>Stop</button>
+          <button class="btn" id="btn-pause" onclick="togglePause()" disabled>Pause</button>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="audio-bar"></div></div>
+        <p style="font-size:11px;color:var(--text-secondary);margin-top:6px">Audio level</p>
+      </div>
+    </div>
+
+    <!-- URL import -->
+    <div id="panel-url" style="display:none">
+      <div class="spacer">
+        <div class="url-row">
+          <input type="url" id="url-field" placeholder="Paste video URL (YouTube, Drive, Loom, Zoom...)" oninput="onUrlInput()" onkeydown="if(event.key==='Enter')loadUrl()">
+          <button class="btn primary" onclick="loadUrl()">Load</button>
+        </div>
+        <div class="url-hint">Supports: YouTube, Google Drive, Loom, Zoom, direct video links</div>
+        <div class="platform-chips">
+          <span class="chip" onclick="demoUrl('youtube')">▶ YouTube</span>
+          <span class="chip" onclick="demoUrl('drive')">◈ Google Drive</span>
+          <span class="chip" onclick="demoUrl('loom')">⬡ Loom</span>
+          <span class="chip" onclick="demoUrl('zoom')">◉ Zoom</span>
+          <span class="chip" onclick="demoUrl('direct')">⬇ Direct MP4</span>
+        </div>
+      </div>
+      <div id="url-loading" class="url-loading" style="display:none">
+        <div class="mini-spinner"></div>
+        <span id="url-loading-text">Fetching video info...</span>
+      </div>
+      <div id="url-error" class="error-box" style="display:none"></div>
+      <div id="url-preview-panel" style="display:none">
+        <div class="url-preview">
+          <div class="url-preview-header">
+            <img class="url-favicon" id="url-favicon" src="" onerror="this.style.display='none'" alt="">
+            <span class="url-title" id="url-vtitle"></span>
+            <span class="url-domain" id="url-domain-tag"></span>
+          </div>
+          <div class="url-video-wrap">
+            <video id="url-video" controls style="max-height:200px;width:100%;margin-bottom:0;border-radius:0;border:none;background:#000"></video>
+            <iframe id="url-iframe" style="display:none;width:100%;height:200px;border:none" allowfullscreen></iframe>
+          </div>
+          <div class="url-meta">
+            <div class="url-meta-item">Platform: <span id="url-platform"></span></div>
+            <div class="url-meta-item">Duration: <span id="url-dur">—</span></div>
+            <div class="url-meta-item">Type: <span id="url-type"></span></div>
+          </div>
+        </div>
+        <button class="btn primary btn-full" onclick="processUrl()">Transcribe & analyze</button>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div id="panel-upload" style="display:none">
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" ondragover="dragOver(event)" ondragleave="dragLeave()" ondrop="dropFile(event)">
+        <div class="upload-icon">📁</div>
+        <div class="upload-title">Drop video or audio file</div>
+        <div class="upload-sub">MP4, WebM, MP3, WAV · up to 2GB</div>
+      </div>
+      <input type="file" id="file-input" accept="video/*,audio/*" style="display:none" onchange="handleFile(this.files[0])">
+      <div id="file-preview" style="margin-top:1rem;display:none">
+        <div class="file-info">
+          <span style="font-size:18px">🎬</span>
+          <div class="file-details">
+            <div class="file-name" id="fname"></div>
+            <div class="file-size" id="fsize"></div>
+          </div>
+          <span class="badge badge-green">Ready</span>
+        </div>
+        <video id="preview-video" controls></video>
+        <button class="btn primary btn-full" onclick="processFile()">Transcribe & analyze</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAPTIONS TAB -->
+  <div id="tab-captions" class="section">
+    <div id="captions-empty" class="empty-state"><p>Record, import from URL, or upload a meeting to generate captions</p></div>
+    <div id="captions-processing" class="processing-state" style="display:none">
+      <div class="spinner"></div>
+      <p id="process-label">Transcribing audio...</p>
+    </div>
+    <div id="captions-content" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:500" id="caption-count"></span>
+          <span class="badge badge-blue" id="source-badge"></span>
+        </div>
+        <input type="text" placeholder="Search captions..." style="width:180px;font-size:12px" oninput="searchCaptions(this.value)">
+      </div>
+      <div class="caption-container" id="caption-list"></div>
+    </div>
+  </div>
+
+  <!-- ANALYSIS TAB -->
+  <div id="tab-analysis" class="section">
+    <div id="analysis-empty" class="empty-state"><p>Analysis will appear after transcription completes</p></div>
+    <div id="analysis-processing" class="processing-state" style="display:none">
+      <div class="spinner"></div>
+      <p>Analyzing meeting content...</p>
+    </div>
+    <div id="analysis-content" style="display:none">
+      <div class="analysis-grid">
+        <div class="metric-card"><div class="metric-label">Duration</div><div class="metric-value" id="met-duration">—</div></div>
+        <div class="metric-card"><div class="metric-label">Speakers</div><div class="metric-value" id="met-speakers">—</div></div>
+        <div class="metric-card"><div class="metric-label">Words</div><div class="metric-value" id="met-words">—</div></div>
+        <div class="metric-card"><div class="metric-label">Sentiment</div><div class="metric-value" id="met-sentiment">—</div></div>
+      </div>
+      <div class="analysis-card"><h3>Summary</h3><p id="summary-text"></p></div>
+      <div class="analysis-card"><h3>Key topics</h3><div class="topic-list" id="topics-list"></div></div>
+      <div class="analysis-card"><h3>Speaker breakdown</h3><div id="speaker-bars"></div></div>
+      <div class="analysis-card"><h3>Action items</h3><ul class="action-list" id="action-list"></ul></div>
+    </div>
+  </div>
+
+  <!-- DOWNLOAD TAB -->
+  <div id="tab-download" class="section">
+    <div id="download-empty" class="empty-state"><p>Complete a recording or import to unlock downloads</p></div>
+    <div id="download-content" style="display:none">
+      <div class="download-grid" id="download-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var state = {
+    mode: 'screen',
+    recording: false, paused: false, mediaRecorder: null, chunks: [],
+    stream: null, timerInterval: null, seconds: 0,
+    audioCtx: null, analyser: null, animFrame: null,
+    file: null, blob: null, urlMeta: null,
+    captions: [], analysisData: null,
+    sourceLabel: 'Screen recording'
+  };
+
+  function switchTab(name) {
+    var tabs = ['record','captions','analysis','download'];
+    document.querySelectorAll('.tab').forEach(function(t, i){ t.classList.toggle('active', tabs[i]===name); });
+    document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('tab-'+name).classList.add('active');
+  }
+
+  function setMode(m) {
+    state.mode = m;
+    ['screen','url','upload'].forEach(function(id){
+      document.getElementById('mode-'+id).classList.toggle('active', id===m);
+      document.getElementById('panel-'+id).style.display = id===m ? 'block' : 'none';
+    });
+  }
+
+  // ── URL IMPORT ──────────────────────────────────────────────────────────
+
+  var DEMO_URLS = {
+    youtube: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    drive: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view',
+    loom: 'https://www.loom.com/share/abc123def456',
+    zoom: 'https://us02web.zoom.us/rec/share/abc123',
+    direct: 'https://www.w3schools.com/html/mov_bbb.mp4'
+  };
+
+  function demoUrl(platform) {
+    document.getElementById('url-field').value = DEMO_URLS[platform];
+    loadUrl();
+  }
+
+  function onUrlInput() {
+    document.getElementById('url-error').style.display = 'none';
+    document.getElementById('url-preview-panel').style.display = 'none';
+  }
+
+  function detectPlatform(url) {
+    if(/youtube\.com|youtu\.be/.test(url)) return 'YouTube';
+    if(/drive\.google\.com/.test(url)) return 'Google Drive';
+    if(/loom\.com/.test(url)) return 'Loom';
+    if(/zoom\.us/.test(url)) return 'Zoom';
+    if(/meet\.google\.com/.test(url)) return 'Google Meet';
+    if(/\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(url)) return 'Direct video';
+    return 'Web video';
+  }
+
+  function getEmbedUrl(url, platform) {
+    if(platform === 'YouTube') {
+      var m = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      return m ? 'https://www.youtube.com/embed/'+m[1] : null;
+    }
+    if(platform === 'Loom') {
+      var m = url.match(/loom\.com\/share\/([a-zA-Z0-9]+)/);
+      return m ? 'https://www.loom.com/embed/'+m[1] : null;
+    }
+    if(platform === 'Google Drive') {
+      var m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      return m ? 'https://drive.google.com/file/d/'+m[1]+'/preview' : null;
+    }
+    return null;
+  }
+
+  function getVideoTitle(url, platform) {
+    var titles = {
+      'YouTube': 'Team Standup — April 2026',
+      'Google Drive': 'Q3 Strategy Meeting Recording.mp4',
+      'Loom': 'Product Demo Walkthrough',
+      'Zoom': 'Weekly All-Hands Recording',
+      'Direct video': url.split('/').pop().split('?')[0],
+      'Google Meet': 'Google Meet Recording',
+      'Web video': 'Video Recording'
+    };
+    return titles[platform] || 'Video';
+  }
+
+  function getFavicon(platform) {
+    var icons = {
+      'YouTube': 'https://www.google.com/s2/favicons?domain=youtube.com&sz=16',
+      'Google Drive': 'https://www.google.com/s2/favicons?domain=drive.google.com&sz=16',
+      'Loom': 'https://www.google.com/s2/favicons?domain=loom.com&sz=16',
+      'Zoom': 'https://www.google.com/s2/favicons?domain=zoom.us&sz=16',
+    };
+    return icons[platform] || '';
+  }
+
+  function loadUrl() {
+    var url = document.getElementById('url-field').value.trim();
+    if(!url) { showUrlError('Please enter a URL.'); return; }
+    var valid = false;
+    try { new URL(url); valid = true; } catch(e) {}
+    if(!valid) { showUrlError('That doesn\'t look like a valid URL. Please include https://'); return; }
+
+    document.getElementById('url-error').style.display = 'none';
+    document.getElementById('url-preview-panel').style.display = 'none';
+    document.getElementById('url-loading').style.display = 'flex';
+    document.getElementById('url-loading-text').textContent = 'Fetching video info...';
+
+    setTimeout(function(){ document.getElementById('url-loading-text').textContent = 'Detecting platform...'; }, 500);
+
+    setTimeout(function(){
+      document.getElementById('url-loading').style.display = 'none';
+      var platform = detectPlatform(url);
+      var embedUrl = getEmbedUrl(url, platform);
+      var isDirect = platform === 'Direct video';
+      var title = getVideoTitle(url, platform);
+      var domain = '';
+      try { domain = new URL(url).hostname.replace('www.',''); } catch(e){}
+
+      state.urlMeta = { url: url, platform: platform, embedUrl: embedUrl, title: title, domain: domain, isDirect: isDirect };
+      state.sourceLabel = platform;
+
+      document.getElementById('url-favicon').src = getFavicon(platform);
+      document.getElementById('url-vtitle').textContent = title;
+      document.getElementById('url-domain-tag').textContent = domain;
+      document.getElementById('url-platform').textContent = platform;
+      document.getElementById('url-dur').textContent = 'Detected after load';
+      document.getElementById('url-type').textContent = isDirect ? 'Direct video' : 'Embedded player';
+
+      var videoEl = document.getElementById('url-video');
+      var iframeEl = document.getElementById('url-iframe');
+
+      if(isDirect) {
+        videoEl.style.display = 'block'; iframeEl.style.display = 'none';
+        videoEl.src = url;
+        videoEl.onloadedmetadata = function(){
+          var d = Math.round(videoEl.duration);
+          var m = Math.floor(d/60), s = d%60;
+          document.getElementById('url-dur').textContent = m+':'+String(s).padStart(2,'0');
+        };
+      } else if(embedUrl) {
+        iframeEl.style.display = 'block'; videoEl.style.display = 'none';
+        iframeEl.src = embedUrl;
+        document.getElementById('url-dur').textContent = 'See player';
+      } else {
+        videoEl.style.display = 'block'; iframeEl.style.display = 'none';
+        videoEl.src = url;
+      }
+      document.getElementById('url-preview-panel').style.display = 'block';
+    }, 1400);
+  }
+
+  function showUrlError(msg) {
+    var el = document.getElementById('url-error');
+    el.textContent = msg; el.style.display = 'block';
+  }
+
+  function processUrl() {
+    switchTab('captions');
+    runProcessing();
+  }
+
+  // ── FILE UPLOAD ─────────────────────────────────────────────────────────
+
+  function handleFile(file) {
+    if(!file) return;
+    state.file = file; state.sourceLabel = 'Uploaded file';
+    document.getElementById('fname').textContent = file.name;
+    document.getElementById('fsize').textContent = formatSize(file.size);
+    document.getElementById('preview-video').src = URL.createObjectURL(file);
+    document.getElementById('file-preview').style.display = 'block';
+  }
+
+  function dragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('dragover'); }
+  function dragLeave() { document.getElementById('upload-zone').classList.remove('dragover'); }
+  function dropFile(e) { e.preventDefault(); dragLeave(); var f = e.dataTransfer.files[0]; if(f) handleFile(f); }
+
+  function processFile() { switchTab('captions'); runProcessing(); }
+
+  // ── SCREEN RECORDING ────────────────────────────────────────────────────
+
+  async function startRecording() {
+    try {
+      state.stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      state.mediaRecorder = new MediaRecorder(state.stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+      state.chunks = [];
+      state.mediaRecorder.ondataavailable = function(e){ if(e.data.size>0) state.chunks.push(e.data); };
+      state.mediaRecorder.onstop = finalizeRecording;
+      state.mediaRecorder.start(1000);
+      state.recording = true; state.seconds = 0; state.sourceLabel = 'Screen recording';
+      document.getElementById('status-dot').classList.add('recording');
+      document.getElementById('status-label').textContent = 'Recording screen...';
+      document.getElementById('btn-start').disabled = true;
+      document.getElementById('btn-stop').disabled = false;
+      document.getElementById('btn-pause').disabled = false;
+      state.timerInterval = setInterval(tickTimer, 1000);
+      startAudioMeter();
+      state.stream.getVideoTracks()[0].onended = stopRecording;
+    } catch(e) { if(e.name!=='NotAllowedError') alert('Could not start: '+e.message); }
+  }
+
+  function stopRecording() {
+    if(!state.recording) return;
+    state.mediaRecorder.stop();
+    state.stream.getTracks().forEach(function(t){ t.stop(); });
+    clearInterval(state.timerInterval);
+    cancelAnimationFrame(state.animFrame);
+    state.recording = false; state.paused = false;
+    document.getElementById('status-dot').classList.remove('recording');
+    document.getElementById('status-label').textContent = 'Processing...';
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+    document.getElementById('btn-pause').disabled = true;
+    document.getElementById('audio-bar').style.width = '0%';
+  }
+
+  function togglePause() {
+    if(!state.mediaRecorder) return;
+    if(state.paused) {
+      state.mediaRecorder.resume();
+      state.timerInterval = setInterval(tickTimer, 1000);
+      document.getElementById('btn-pause').textContent = 'Pause';
+      document.getElementById('status-label').textContent = 'Recording screen...';
+    } else {
+      state.mediaRecorder.pause();
+      clearInterval(state.timerInterval);
+      document.getElementById('btn-pause').textContent = 'Resume';
+      document.getElementById('status-label').textContent = 'Paused';
+    }
+    state.paused = !state.paused;
+  }
+
+  function tickTimer() {
+    state.seconds++;
+    var h=Math.floor(state.seconds/3600), m=Math.floor((state.seconds%3600)/60), s=state.seconds%60;
+    document.getElementById('timer').textContent = [h,m,s].map(function(n){ return String(n).padStart(2,'0'); }).join(':');
+  }
+
+  function startAudioMeter() {
+    var track = state.stream.getAudioTracks()[0];
+    if(!track) return;
+    state.audioCtx = new AudioContext();
+    var src = state.audioCtx.createMediaStreamSource(new MediaStream([track]));
+    state.analyser = state.audioCtx.createAnalyser();
+    state.analyser.fftSize = 256;
+    src.connect(state.analyser);
+    var data = new Uint8Array(state.analyser.frequencyBinCount);
+    function tick() {
+      state.analyser.getByteFrequencyData(data);
+      var avg = data.reduce(function(a,b){return a+b;},0)/data.length;
+      document.getElementById('audio-bar').style.width = Math.min(100, avg*2)+'%';
+      state.animFrame = requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  function finalizeRecording() {
+    state.blob = new Blob(state.chunks, { type: 'video/webm' });
+    document.getElementById('status-label').textContent = 'Saved · '+formatSize(state.blob.size);
+    switchTab('captions');
+    runProcessing();
+  }
+
+  // ── PROCESSING ──────────────────────────────────────────────────────────
+
+  function runProcessing() {
+    document.getElementById('captions-empty').style.display = 'none';
+    document.getElementById('captions-processing').style.display = 'block';
+    document.getElementById('captions-content').style.display = 'none';
+    document.getElementById('analysis-empty').style.display = 'block';
+    document.getElementById('analysis-content').style.display = 'none';
+    var steps = ['Extracting audio...','Transcribing speech...','Detecting speakers...','Generating captions...'];
+    var lbl = document.getElementById('process-label');
+    var step = 0;
+    var interval = setInterval(function(){
+      lbl.textContent = steps[Math.min(step, steps.length-1)];
+      step++;
+      if(step > steps.length) {
+        clearInterval(interval);
+        generateDemoData();
+        showCaptions();
+        setTimeout(showAnalysis, 300);
+        setTimeout(showDownloads, 300);
+      }
+    }, 750);
+  }
+
+  // ── DEMO DATA ───────────────────────────────────────────────────────────
+
+  var DEMO_CAPTIONS = [
+    {ts:'0:00',spk:'Alex Chen',text:'Good morning everyone, let\'s get started. Today we\'re reviewing Q3 targets and planning the product roadmap for next quarter.'},
+    {ts:'0:18',spk:'Priya Sharma',text:'Thanks Alex. Before we dive in, I wanted to flag that our retention metrics improved significantly — up 12% month over month.'},
+    {ts:'0:35',spk:'Jordan Lee',text:'That\'s great news! I think the onboarding changes we shipped last month had a real impact there.'},
+    {ts:'0:48',spk:'Alex Chen',text:'Agreed. Let\'s make sure we document what worked. Priya, can you own the writeup for that?'},
+    {ts:'1:02',spk:'Priya Sharma',text:'Absolutely, I\'ll have a draft by Friday.'},
+    {ts:'1:08',spk:'Jordan Lee',text:'On the roadmap side, we have three major initiatives: the API redesign, the mobile app refresh, and the new billing flow.'},
+    {ts:'1:22',spk:'Alex Chen',text:'The API redesign is highest priority — it unblocks two enterprise customers we\'ve been trying to close for months.'},
+    {ts:'1:38',spk:'Priya Sharma',text:'Should we shift some engineering capacity from mobile to accelerate the API work?'},
+    {ts:'1:50',spk:'Jordan Lee',text:'I\'d say yes. Mobile is in good shape. We can revisit the refresh in Q4 without major impact.'},
+    {ts:'2:05',spk:'Alex Chen',text:'Let\'s do that. Jordan, can you coordinate with the eng leads and update the sprint plan?'},
+    {ts:'2:18',spk:'Jordan Lee',text:'On it. I\'ll send the updated plan by end of day tomorrow.'},
+    {ts:'2:28',spk:'Priya Sharma',text:'One more thing — we need to decide on the pricing page redesign. Marketing is asking.'},
+    {ts:'2:40',spk:'Alex Chen',text:'Let\'s schedule a separate session for that. I\'ll send a Thursday invite.'},
+    {ts:'2:55',spk:'Jordan Lee',text:'Sounds good. I think that covers everything. Great session!'},
+    {ts:'3:02',spk:'Alex Chen',text:'Thanks all. Talk soon.'},
+  ];
+
+  function generateDemoData() {
+    state.captions = DEMO_CAPTIONS;
+    state.analysisData = {
+      duration: '3:10', speakers: 3, words: 312, sentiment: 'Positive',
+      summary: 'The team reviewed Q3 progress, noting a 12% improvement in retention attributed to recent onboarding changes. The API redesign was prioritized to unblock enterprise customers, with engineering capacity reallocated from mobile. A separate session was planned to discuss the pricing page redesign.',
+      topics: ['Q3 Retention','API Redesign','Product Roadmap','Engineering Allocation','Pricing Page','Mobile App'],
+      speakers: [{name:'Alex Chen',pct:42,color:'#378ADD'},{name:'Jordan Lee',pct:33,color:'#1D9E75'},{name:'Priya Sharma',pct:25,color:'#D4537E'}],
+      actions: ['Priya to write up retention analysis by Friday','Jordan to update sprint plan by end of day tomorrow','Alex to send Thursday invite for pricing page discussion']
+    };
+  }
+
+  function showCaptions() {
+    document.getElementById('captions-processing').style.display = 'none';
+    document.getElementById('captions-content').style.display = 'block';
+    document.getElementById('caption-count').textContent = state.captions.length + ' segments';
+    document.getElementById('source-badge').textContent = state.sourceLabel;
+    renderCaptions(state.captions);
+  }
+
+  function renderCaptions(list) {
+    document.getElementById('caption-list').innerHTML = list.map(function(c,i){
+      return '<div class="caption-item" id="cap-'+i+'"><span class="caption-ts">'+c.ts+'</span><span class="caption-speaker">'+c.spk+'</span><span class="caption-text">'+c.text+'</span></div>';
+    }).join('');
+  }
+
+  function searchCaptions(q) {
+    var filtered = q ? state.captions.filter(function(c){ return c.text.toLowerCase().includes(q.toLowerCase())||c.spk.toLowerCase().includes(q.toLowerCase()); }) : state.captions;
+    renderCaptions(filtered);
+  }
+
+  function showAnalysis() {
+    var a = state.analysisData;
+    document.getElementById('analysis-empty').style.display = 'none';
+    document.getElementById('analysis-content').style.display = 'block';
+    document.getElementById('met-duration').textContent = a.duration;
+    document.getElementById('met-speakers').textContent = a.speakers;
+    document.getElementById('met-words').textContent = a.words;
+    document.getElementById('met-sentiment').textContent = a.sentiment;
+    document.getElementById('summary-text').textContent = a.summary;
+    document.getElementById('topics-list').innerHTML = a.topics.map(function(t){ return '<span class="badge badge-blue">'+t+'</span>'; }).join('');
+    document.getElementById('speaker-bars').innerHTML = a.speakers.map(function(s){
+      return '<div class="speaker-row"><span class="speaker-name">'+s.name+'</span><div class="speaker-track"><div class="speaker-fill" style="width:'+s.pct+'%;background:'+s.color+'"></div></div><span class="speaker-pct">'+s.pct+'%</span></div>';
+    }).join('');
+    document.getElementById('action-list').innerHTML = a.actions.map(function(x){ return '<li><span class="action-check">✓</span>'+x+'</li>'; }).join('');
+  }
+
+  function showDownloads() {
+    document.getElementById('download-empty').style.display = 'none';
+    document.getElementById('download-content').style.display = 'block';
+    var items = [
+      {icon:'🎬',label:'Video recording',sub:'WebM · Full meeting',fn:'downloadBlob'},
+      {icon:'📄',label:'Transcript (TXT)',sub:'Plain text with timestamps',fn:'downloadTxt'},
+      {icon:'💬',label:'Captions (SRT)',sub:'Standard subtitle file',fn:'downloadSRT'},
+      {icon:'📊',label:'Analysis report',sub:'Summary + action items',fn:'downloadReport'},
+    ];
+    document.getElementById('download-grid').innerHTML = items.map(function(d){
+      return '<button class="download-btn" onclick="'+d.fn+'()"><span class="dl-icon">'+d.icon+'</span><div class="dl-info"><div class="dl-label">'+d.label+'</div><div class="dl-sub">'+d.sub+'</div></div></button>';
+    }).join('');
+  }
+
+  function downloadBlob() {
+    var blob = state.blob || new Blob(['[demo recording]'],{type:'video/webm'});
+    triggerDownload(URL.createObjectURL(blob),'meet-recording.webm');
+  }
+  function downloadTxt() {
+    var txt = state.captions.map(function(c){ return '['+c.ts+'] '+c.spk+': '+c.text; }).join('\n');
+    triggerDownload('data:text/plain;charset=utf-8,'+encodeURIComponent(txt),'transcript.txt');
+  }
+  function downloadSRT() {
+    var srt = '';
+    state.captions.forEach(function(c,i){
+      var parts = c.ts.split(':').map(Number);
+      var m=parts[0], s=parts[1];
+      srt += (i+1)+'\n00:0'+m+':'+String(s).padStart(2,'0')+',000 --> 00:0'+m+':'+String(Math.min(59,s+10)).padStart(2,'0')+',000\n'+c.spk+': '+c.text+'\n\n';
+    });
+    triggerDownload('data:text/plain;charset=utf-8,'+encodeURIComponent(srt),'captions.srt');
+  }
+  function downloadReport() {
+    var a = state.analysisData;
+    var txt = 'MEETING ANALYSIS REPORT\n'+'='.repeat(40)+'\nSource: '+state.sourceLabel+'\n\nSUMMARY\n'+a.summary+'\n\nKEY TOPICS\n'+a.topics.join(', ')+'\n\nACTION ITEMS\n'+a.actions.map(function(x){ return '• '+x; }).join('\n')+'\n\nSPEAKER BREAKDOWN\n'+a.speakers.map(function(s){ return s.name+': '+s.pct+'%'; }).join('\n');
+    triggerDownload('data:text/plain;charset=utf-8,'+encodeURIComponent(txt),'meeting-report.txt');
+  }
+  function triggerDownload(url, name) {
+    var a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  }
+  function formatSize(b) {
+    if(b>1e9) return (b/1e9).toFixed(1)+' GB';
+    if(b>1e6) return (b/1e6).toFixed(1)+' MB';
+    return Math.round(b/1e3)+' KB';
+  }
+</script>
+</body>
+</html>
